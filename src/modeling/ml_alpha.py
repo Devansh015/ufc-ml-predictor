@@ -22,6 +22,10 @@ def main():
     y_train = train_df["red_win"].astype(int)
     y_test  = test_df["red_win"].astype(int)
 
+    print("y_train distribution:", y_train.value_counts().to_dict())
+    print("y_test distribution:", y_test.value_counts().to_dict())
+
+
     # Drop non-features
     drop_cols = ["fight_url", "red_fighter", "blue_fighter", "red_win"]
     X_train = train_df.drop(columns=drop_cols)
@@ -38,8 +42,10 @@ def main():
         subsample=0.9,
         colsample_bytree=0.9,
         reg_lambda=1.0,
+        class_weight="balanced",
         random_state=42,
     )
+
 
     model.fit(
         X_train, y_train,

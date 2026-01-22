@@ -6,7 +6,7 @@ import re
 DETAILS = "data/processed/fight_details.csv"
 TOTALS  = "data/processed/fighter_totals.csv"
 ROUND_STATS = "data/raw/round_stats.csv"
-FIGHTS  = "data/raw/fights.csv"
+FIGHTS_CLEAN = "data/raw/fights_clean.csv"  # Clean data with reliable winner labels
 EVENTS  = "data/raw/events.csv"
 
 OUT_DIR = Path("data/features")
@@ -162,11 +162,14 @@ def _build_per_fight_fighter_stats_from_rounds(fights_df, rounds_df):
     return out
 
 def main():
-    fights  = pd.read_csv(FIGHTS)
+    fights  = pd.read_csv(FIGHTS_CLEAN)
     # fighter_totals in this repo currently encodes BOTH fighters in one row;
     # per-fighter stats are derived from ROUND_STATS below.
     events  = pd.read_csv(EVENTS)
     rounds  = pd.read_csv(ROUND_STATS)
+
+    # Filter to fights with known winners (exclude draws, NC, and unknown)
+    fights = fights[fights["winner"].isin(["red", "blue"])].copy()
 
     # ---------------------------
     # Fix event dates (authoritative)
@@ -231,10 +234,9 @@ def main():
             feature_row[f"delta_{stat}"] = _safe_sub(r, b)
 
         # ---------------------------
-        # Label (winner inference)
+        # Label (from fight-details page W/L status)
         # ---------------------------
-        winner_text = str(fight["result_marker"]).lower()
-        feature_row["red_win"] = 1 if red.lower() in winner_text else 0
+        feature_row["red_win"] = 1 if fight["winner"] == "red" else 0
 
         rows.append(feature_row)
 

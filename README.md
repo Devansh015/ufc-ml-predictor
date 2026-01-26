@@ -17,12 +17,13 @@ All features are derived strictly from **past fights** to prevent data leakage.
   - Win probability per fighter
 - Engineered matchup (delta) features between fighters
 
-## 🖥️ Frontend (Planned)
+## 🖥️ Frontend WIP
 
 The project will include a lightweight frontend that:
 - Allows users to **select fighters from searchable dropdowns**
 - Sends the selected matchup to the prediction engine
 - Displays results in a clear, user-friendly format
+- To be used for for future fight predictions
 
 The frontend will interface directly with the trained model via a simple API or local prediction script.
 

@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>UFC Matchup Predictor — React</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: Arial, Helvetica, sans-serif; max-width:800px; margin:32px auto; }
+      .row { display:flex; gap:12px; }
+      .col { flex:1 }
+      input[type=text] { width:100%; padding:8px; }
+      button { padding:10px 14px; margin-top:12px }
+      pre { background:#f7f7f7; padding:12px }
+    </style>
+    <!-- React + ReactDOM + Babel (development, no build) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6.26.0/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const {useState} = React;
+
+      function App(){
+        const [a, setA] = useState('Tito Ortiz');
+        const [b, setB] = useState('Chuck Liddell');
+        const [recency, setRecency] = useState(true);
+        const [decay, setDecay] = useState(0.9);
+        const [lastN, setLastN] = useState(5);
+        const [out, setOut] = useState(null);
+        const [loading, setLoading] = useState(false);
+
+        async function predict(){
+          setLoading(true); setOut(null);
+          try{
+            const resp = await fetch('/predict', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({fighter_a: a, fighter_b: b, recency, decay: parseFloat(decay), last_n: parseInt(lastN)})
+            });
+            const j = await resp.json();
+            setOut(j);
+          }catch(err){
+            setOut({error: ''+err});
+          } finally { setLoading(false) }
+        }
+
+        return (
+          <div>
+            <h1>UFC Matchup Predictor (React)</h1>
+            <div className="row">
+              <div className="col"><label>Fighter A<input value={a} onChange={e=>setA(e.target.value)} type="text"/></label></div>
+              <div className="col"><label>Fighter B<input value={b} onChange={e=>setB(e.target.value)} type="text"/></label></div>
+            </div>
+            <label><input type="checkbox" checked={recency} onChange={e=>setRecency(e.target.checked)} /> Use recency-weighted aggregates</label>
+            <div className="row">
+              <div className="col"><label>Decay<input value={decay} onChange={e=>setDecay(e.target.value)} type="text"/></label></div>
+              <div className="col"><label>Last N<input value={lastN} onChange={e=>setLastN(e.target.value)} type="text"/></label></div>
+            </div>
+            <button onClick={predict} disabled={loading}>{loading? 'Predicting...' : 'Predict'}</button>
+
+            {out && <div style={{marginTop:16}}>
+              <h3>Result</h3>
+              <pre>{JSON.stringify(out, null, 2)}</pre>
+            </div>}
+            <p style={{marginTop:12,color:'#666'}}>Notes: the app posts to <code>/predict</code> (Flask backend) and returns JSON. Run the Flask app to serve this file at the same origin.</p>
+          </div>
+        )
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+    </script>
+  </body>
+</html>

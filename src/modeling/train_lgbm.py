@@ -31,6 +31,7 @@ def load_and_prep(path, target_col="red_win"):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--input", default="data/features/fight_features_alpha.csv")
+    p.add_argument("--params-file", default=None, help="JSON file with model params (optional)")
     p.add_argument("--model-out", default="models/lgbm_model.pkl")
     p.add_argument("--metrics-out", default="models/metrics.json")
     p.add_argument("--feature-imp-out", default="models/feature_importances.csv")
@@ -59,18 +60,34 @@ def main():
         X_train, y_train, test_size=0.15, stratify=y_train, random_state=args.random_state
     )
 
-    clf = lgb.LGBMClassifier(
-        n_estimators=args.n_estimators,
-        random_state=args.random_state,
-        n_jobs=-1,
-    )
+    # allow loading tuned params
+    model_params = {}
+    if args.params_file:
+        import json as _json
 
-    clf.fit(
-        X_tr,
-        y_tr,
-        eval_set=[(X_val, y_val)],
-        eval_metric="auc",
-    )
+        with open(args.params_file, "r") as _fh:
+            loaded = _json.load(_fh)
+        # support study file format {"best_params": {...}}
+        if "best_params" in loaded:
+            model_params = loaded["best_params"]
+        else:
+            model_params = loaded
+
+    # ensure n_estimators and random_state
+    model_params.setdefault("n_estimators", args.n_estimators)
+    model_params.setdefault("random_state", args.random_state)
+    model_params.setdefault("n_jobs", -1)
+
+    clf = lgb.LGBMClassifier(**model_params)
+
+    # fit with early stopping via callbacks
+    callbacks = []
+    if args.early_stopping and int(args.early_stopping) > 0:
+        callbacks.append(lgb.early_stopping(stopping_rounds=int(args.early_stopping)))
+    # silence training logs
+    callbacks.append(lgb.log_evaluation(period=0))
+
+    clf.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], eval_metric="auc", callbacks=callbacks)
 
     # predictions
     y_pred_proba = clf.predict_proba(X_test)[:, 1]

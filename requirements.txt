@@ -8,3 +8,4 @@ lightgbm
 sqlalchemy
 tqdm
 joblib
+optuna

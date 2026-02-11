@@ -27,8 +27,6 @@
         const [a, setA] = useState('Tito Ortiz');
         const [b, setB] = useState('Chuck Liddell');
         const [recency, setRecency] = useState(true);
-        const [decay, setDecay] = useState(0.9);
-        const [lastN, setLastN] = useState(5);
         const [out, setOut] = useState(null);
         const [loading, setLoading] = useState(false);
 
@@ -37,7 +35,7 @@
           try{
             const resp = await fetch('/predict', {
               method: 'POST', headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({fighter_a: a, fighter_b: b, recency, decay: parseFloat(decay), last_n: parseInt(lastN)})
+              body: JSON.stringify({fighter_a: a, fighter_b: b, recency})
             });
             const j = await resp.json();
             setOut(j);
@@ -54,10 +52,7 @@
               <div className="col"><label>Fighter B<input value={b} onChange={e=>setB(e.target.value)} type="text"/></label></div>
             </div>
             <label><input type="checkbox" checked={recency} onChange={e=>setRecency(e.target.checked)} /> Use recency-weighted aggregates</label>
-            <div className="row">
-              <div className="col"><label>Decay<input value={decay} onChange={e=>setDecay(e.target.value)} type="text"/></label></div>
-              <div className="col"><label>Last N<input value={lastN} onChange={e=>setLastN(e.target.value)} type="text"/></label></div>
-            </div>
+            
             <button onClick={predict} disabled={loading}>{loading? 'Predicting...' : 'Predict'}</button>
 
             {out && <div style={{marginTop:16}}>

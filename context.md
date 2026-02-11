@@ -22,3 +22,6 @@
 - Analysis metrics & report: models/analysis/analysis_metrics.json, models/analysis/analysis_report.json
 
 Notes: SHAP was computed using `shap.TreeExplainer` on the held-out test split created with `random_state=42` and `test_size=0.2`.
+pip3 install -r requirements.txt
+# or
+pip3 install flask pandas numpy joblib

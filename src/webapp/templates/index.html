@@ -16,8 +16,6 @@
     <label>Fighter A<input id="a" type="text" value="Tito Ortiz" /></label>
     <label>Fighter B<input id="b" type="text" value="Chuck Liddell" /></label>
     <label><input id="recency" type="checkbox" checked /> Use recency-weighted aggregates</label>
-    <label>Decay <input id="decay" type="text" value="0.9" /></label>
-    <label>Last N fights <input id="lastn" type="text" value="5" /></label>
     <button id="go">Predict</button>
 
     <div id="out" class="result"></div>
@@ -27,11 +25,9 @@
         const a = document.getElementById('a').value;
         const b = document.getElementById('b').value;
         const recency = document.getElementById('recency').checked;
-        const decay = parseFloat(document.getElementById('decay').value) || 0.9;
-        const last_n = parseInt(document.getElementById('lastn').value) || 5;
         const resp = await fetch('/predict', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({fighter_a: a, fighter_b: b, recency, decay, last_n})
+          body: JSON.stringify({fighter_a: a, fighter_b: b, recency})
         });
         const j = await resp.json();
         document.getElementById('out').innerText = JSON.stringify(j, null, 2);

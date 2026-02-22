@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "http-server -c-1 -p 3000"
+    "start": "http-server -c-1 -p 3000",
+    "dev": "python3 ../app.py"
   },
   "devDependencies": {
     "http-server": "^14.1.1"

@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "features" / "fight_features_alpha.csv"
 DEFAULT_MODEL = ROOT / "models" / "lgbm_symmetric.pkl"
 
-app = Flask(__name__, template_folder="templates")
+app = Flask(__name__)
 
 # load once
 df = pd.read_csv(DATA_PATH)
@@ -98,12 +98,12 @@ def build_synthetic_row(df: pd.DataFrame, a: str, b: str, feature_cols, use_rece
 
 @app.route("/", methods=["GET"])
 def index():
-    # Serve React single-file UI if present, otherwise fall back to template index
+    # Serve React single-file UI
     react_dir = ROOT / "src" / "webapp" / "react"
     idx = react_dir / "index.html"
     if idx.exists():
         return send_from_directory(str(react_dir), "index.html")
-    return render_template("index.html")
+    return "React frontend not found", 404
 
 
 @app.route('/react/<path:filename>')

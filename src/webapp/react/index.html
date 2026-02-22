@@ -15,6 +15,21 @@
       button:disabled { opacity:0.6; cursor:default }
       .controls { display:flex; align-items:center; gap:12px; margin-top:12px }
       .result-card { margin-top:20px; background: linear-gradient(180deg,#ffffff,#fbfdff); border-radius:10px; padding:18px; border:1px solid #e6eef8; display:flex; align-items:center; gap:16px }
+
+      /* Animations */
+      @keyframes fadeInUp { from { opacity:0; transform: translateY(10px) scale(.98); } to { opacity:1; transform: translateY(0) scale(1); } }
+      @keyframes pulse { 0%{ transform:scale(1) } 50%{ transform:scale(1.06) } 100%{ transform:scale(1) } }
+      .enter { animation: fadeInUp 420ms cubic-bezier(.2,.9,.2,1) both; }
+      .pulse { animation: pulse 1200ms ease-in-out infinite; }
+
+      /* spinner */
+      .spinner { width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,0.2);border-top-color:rgba(255,255,255,0.9);animation:spin 1s linear infinite;display:inline-block }
+      @keyframes spin { to { transform:rotate(360deg) } }
+
+      /* confetti */
+      .confetti-container { position:fixed; left:0; top:0; width:100%; height:0; pointer-events:none; z-index:1200 }
+      .confetti { position:absolute; width:10px; height:14px; opacity:0.95; border-radius:2px; animation:fall 1200ms linear forwards; }
+      @keyframes fall { to { transform: translateY(420px) rotate(540deg); opacity:0 } }
       .winner-badge { background:#111827; color:white; padding:12px 16px; border-radius:8px; font-weight:700; font-size:18px }
       .winner-text { font-size:18px; color:#0b1220 }
       .muted { color:#6b7280; font-size:13px }
@@ -37,6 +52,7 @@
         const [recency, setRecency] = useState(true);
         const [out, setOut] = useState(null);
         const [loading, setLoading] = useState(false);
+        const [animate, setAnimate] = useState(false);
 
         async function predict(){
           setLoading(true); setOut(null);
@@ -46,10 +62,38 @@
               body: JSON.stringify({fighter_a: a, fighter_b: b, recency})
             });
             const j = await resp.json();
-            setOut(j);
+              setOut(j);
+              // trigger entrance animation
+              setAnimate(false);
+              // slight delay to allow class toggle
+              setTimeout(()=> setAnimate(true), 40);
+              // launch confetti when a winner exists
+              if (j && j.winner) {
+                launchConfetti();
+              }
           }catch(err){
             setOut({error: ''+err});
           } finally { setLoading(false) }
+        }
+
+        function launchConfetti(){
+          const container = document.getElementById('confetti');
+          if (!container) return;
+          const colors = ['#ef4444','#f59e0b','#10b981','#3b82f6','#a78bfa'];
+          for(let i=0;i<28;i++){
+            const el = document.createElement('div');
+            el.className = 'confetti';
+            el.style.left = (20 + Math.random()*60) + '%';
+            el.style.background = colors[Math.floor(Math.random()*colors.length)];
+            el.style.top = (10 + Math.random()*20) + 'vh';
+            el.style.transform = `translateY(-20vh) rotate(${Math.random()*360}deg)`;
+            el.style.animationDelay = (Math.random()*200) + 'ms';
+            el.style.width = (6 + Math.random()*10) + 'px';
+            el.style.height = (10 + Math.random()*8) + 'px';
+            container.appendChild(el);
+            // cleanup
+            setTimeout(()=> el.remove(), 1800);
+          }
         }
 
         return (
@@ -61,14 +105,14 @@
             </div>
                 <div className="controls">
                   <label style={{display:'flex',alignItems:'center',gap:8}}><input type="checkbox" checked={recency} onChange={e=>setRecency(e.target.checked)} /> Use recency-weighted aggregates</label>
-                  <button onClick={predict} disabled={loading}>{loading? 'Predicting...' : 'Predict'}</button>
+                  <button onClick={predict} disabled={loading}>{loading? <span style={{display:'inline-flex',alignItems:'center',gap:8}}><span className="spinner"/> Predicting...</span> : 'Predict'}</button>
                 </div>
 
                 {out && <div style={{marginTop:16}}>
                   <h3 style={{margin:'10px 0 6px 0'}}>Result</h3>
                   {out.winner ? (
-                    <div className="result-card">
-                      <div className="winner-badge">Winner</div>
+                    <div className={`result-card ${animate? 'enter':''}`}>
+                      <div className={`winner-badge ${animate? 'pulse':''}`}>Winner</div>
                       <div>
                         <div className="winner-text">{out.winner}</div>
                         <div className="muted">Predicted winner from the model</div>
@@ -78,6 +122,7 @@
                     <pre>{JSON.stringify(out, null, 2)}</pre>
                   )}
                 </div>}
+                <div id="confetti" className="confetti-container" aria-hidden="true"></div>
           </div>
         )
       }

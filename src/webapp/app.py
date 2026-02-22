@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "features" / "fight_features_alpha.csv"
-DEFAULT_MODEL = ROOT / "models" / "lgbm_tuned_final.pkl"
+DEFAULT_MODEL = ROOT / "models" / "lgbm_symmetric.pkl"
 
 app = Flask(__name__, template_folder="templates")
 
@@ -131,7 +131,7 @@ def predict():
         proba_red = clf.predict_proba(X)[:, 1][0]
         proba_a = 1.0 - proba_red if swapped else proba_red
         proba_b = 1.0 - proba_a
-        winner = body.get("fighter_a") if proba_a >= proba_b else body.get("fighter_b")
+        winner = body.get("fighter_a") if proba_a > proba_b else body.get("fighter_b")
         return jsonify({"winner": winner})
 
     Xsyn = build_synthetic_row(df, a, b, saved_features, use_recency=recency, decay=decay, last_n=last_n)
@@ -142,7 +142,7 @@ def predict():
     proba_red = clf.predict_proba(Xsyn)[:, 1][0]
     proba_a = proba_red
     proba_b = 1.0 - proba_a
-    winner = body.get("fighter_a") if proba_a >= proba_b else body.get("fighter_b")
+    winner = body.get("fighter_a") if proba_a > proba_b else body.get("fighter_b")
     return jsonify({"winner": winner})
 
 

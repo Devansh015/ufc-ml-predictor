@@ -323,6 +323,8 @@ def main():
 
         # Label (from fights_clean winner)
         feature_row["red_win"] = 1 if fight["winner"] == "red" else 0
+        # preserve original winner label to allow correct swapping
+        feature_row["winner"] = fight["winner"]
         rows.append(feature_row)
 
         # ---------------------------
@@ -391,6 +393,39 @@ def main():
             fighter_state[fighter]["fights"] += 1
 
     df = pd.DataFrame(rows)
+
+    # --- Symmetry augmentation: add mirrored rows with red/blue swapped ---
+    if not df.empty:
+        swapped_rows = []
+        for _, r in df.iterrows():
+            newr = {}
+            for col, val in r.items():
+                if col == 'red_fighter':
+                    newr['red_fighter'] = r.get('blue_fighter')
+                elif col == 'blue_fighter':
+                    newr['blue_fighter'] = r.get('red_fighter')
+                elif col.startswith('red_'):
+                    # red_X becomes blue_X
+                    newr['blue_' + col[len('red_'):]] = val
+                elif col.startswith('blue_'):
+                    # blue_X becomes red_X
+                    newr['red_' + col[len('blue_'):]] = val
+                elif col == 'red_win':
+                    # will set below based on original 'winner'
+                    continue
+                else:
+                    # keep other columns (fight_url, etc.) unchanged
+                    newr[col] = val
+            swapped_rows.append(newr)
+        # set red_win for swapped rows using original winner label
+        for nr, orig in zip(swapped_rows, df.itertuples(index=False)):
+            # orig.winner is the original winner string ('red' or 'blue')
+            winner_label = orig._asdict().get('winner') if hasattr(orig, '_asdict') else orig[ df.columns.get_loc('winner') ]
+            nr['red_win'] = 1 if winner_label == 'blue' else 0
+
+        df_swapped = pd.DataFrame(swapped_rows)
+        # ensure same column order/types
+        df = pd.concat([df, df_swapped], ignore_index=True, sort=False)
 
     if df.empty or ("red_fights" not in df.columns) or ("blue_fights" not in df.columns):
         print("No feature rows were generated.")

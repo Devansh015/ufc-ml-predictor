@@ -5,12 +5,20 @@
     <title>UFC Matchup Predictor — React</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { font-family: Arial, Helvetica, sans-serif; max-width:800px; margin:32px auto; }
+      body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; max-width:900px; margin:36px auto; color:#111827; background:#f5f7fb; }
+      .container { background: #ffffff; border-radius:12px; padding:28px; box-shadow: 0 6px 18px rgba(15,23,42,0.08); }
+      h1 { margin:0 0 18px 0; font-weight:600; color:#0f172a }
       .row { display:flex; gap:12px; }
       .col { flex:1 }
-      input[type=text] { width:100%; padding:8px; }
-      button { padding:10px 14px; margin-top:12px }
-      pre { background:#f7f7f7; padding:12px }
+      input[type=text] { width:100%; padding:10px 12px; border:1px solid #e6e9ef; border-radius:8px; font-size:14px }
+      button { padding:10px 16px; margin-top:12px; background:#2563eb; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600 }
+      button:disabled { opacity:0.6; cursor:default }
+      .controls { display:flex; align-items:center; gap:12px; margin-top:12px }
+      .result-card { margin-top:20px; background: linear-gradient(180deg,#ffffff,#fbfdff); border-radius:10px; padding:18px; border:1px solid #e6eef8; display:flex; align-items:center; gap:16px }
+      .winner-badge { background:#111827; color:white; padding:12px 16px; border-radius:8px; font-weight:700; font-size:18px }
+      .winner-text { font-size:18px; color:#0b1220 }
+      .muted { color:#6b7280; font-size:13px }
+      pre { background:#f7f7f7; padding:12px; border-radius:8px }
     </style>
     <!-- React + ReactDOM + Babel (development, no build) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -45,20 +53,31 @@
         }
 
         return (
-          <div>
-            <h1>UFC Matchup Predictor (React)</h1>
+          <div className="container">
+            <h1>UFC Matchup Predictor</h1>
             <div className="row">
               <div className="col"><label>Fighter A<input value={a} onChange={e=>setA(e.target.value)} type="text"/></label></div>
               <div className="col"><label>Fighter B<input value={b} onChange={e=>setB(e.target.value)} type="text"/></label></div>
             </div>
-            <label><input type="checkbox" checked={recency} onChange={e=>setRecency(e.target.checked)} /> Use recency-weighted aggregates</label>
-            
-            <button onClick={predict} disabled={loading}>{loading? 'Predicting...' : 'Predict'}</button>
+                <div className="controls">
+                  <label style={{display:'flex',alignItems:'center',gap:8}}><input type="checkbox" checked={recency} onChange={e=>setRecency(e.target.checked)} /> Use recency-weighted aggregates</label>
+                  <button onClick={predict} disabled={loading}>{loading? 'Predicting...' : 'Predict'}</button>
+                </div>
 
-            {out && <div style={{marginTop:16}}>
-              <h3>Result</h3>
-              <pre>{JSON.stringify(out, null, 2)}</pre>
-            </div>}
+                {out && <div style={{marginTop:16}}>
+                  <h3 style={{margin:'10px 0 6px 0'}}>Result</h3>
+                  {out.winner ? (
+                    <div className="result-card">
+                      <div className="winner-badge">Winner</div>
+                      <div>
+                        <div className="winner-text">{out.winner}</div>
+                        <div className="muted">Predicted winner from the model</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <pre>{JSON.stringify(out, null, 2)}</pre>
+                  )}
+                </div>}
             <p style={{marginTop:12,color:'#666'}}>Notes: the app posts to <code>/predict</code> (Flask backend) and returns JSON. Run the Flask app to serve this file at the same origin.</p>
           </div>
         )

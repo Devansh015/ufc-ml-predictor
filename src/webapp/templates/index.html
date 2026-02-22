@@ -21,6 +21,17 @@
     <div id="out" class="result"></div>
 
     <script>
+      function makeResultCard(name){
+        return `
+          <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(180deg,#fff,#fbfdff);padding:14px;border-radius:10px;border:1px solid #e6eef8;">
+            <div style="background:#111827;color:#fff;padding:10px 14px;border-radius:8px;font-weight:700">Winner</div>
+            <div>
+              <div style="font-size:18px;color:#0b1220;font-weight:600">${name}</div>
+              <div style="color:#6b7280;font-size:13px">Predicted winner from the model</div>
+            </div>
+          </div>`
+      }
+
       document.getElementById('go').onclick = async function(){
         const a = document.getElementById('a').value;
         const b = document.getElementById('b').value;
@@ -30,7 +41,11 @@
           body: JSON.stringify({fighter_a: a, fighter_b: b, recency})
         });
         const j = await resp.json();
-        document.getElementById('out').innerText = JSON.stringify(j, null, 2);
+        if (j && j.winner) {
+          document.getElementById('out').innerHTML = makeResultCard(j.winner);
+        } else {
+          document.getElementById('out').innerText = JSON.stringify(j, null, 2);
+        }
       }
     </script>
   </body>

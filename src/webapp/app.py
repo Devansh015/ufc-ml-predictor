@@ -131,7 +131,8 @@ def predict():
         proba_red = clf.predict_proba(X)[:, 1][0]
         proba_a = 1.0 - proba_red if swapped else proba_red
         proba_b = 1.0 - proba_a
-        return jsonify({"p_a": proba_a, "p_b": proba_b, "method": "historical_row"})
+        winner = body.get("fighter_a") if proba_a >= proba_b else body.get("fighter_b")
+        return jsonify({"winner": winner})
 
     Xsyn = build_synthetic_row(df, a, b, saved_features, use_recency=recency, decay=decay, last_n=last_n)
     Xsyn = Xsyn.reindex(columns=saved_features)
@@ -141,7 +142,8 @@ def predict():
     proba_red = clf.predict_proba(Xsyn)[:, 1][0]
     proba_a = proba_red
     proba_b = 1.0 - proba_a
-    return jsonify({"p_a": proba_a, "p_b": proba_b, "method": "synthetic_aggregates", "recency_used": recency, "decay": decay, "last_n": last_n})
+    winner = body.get("fighter_a") if proba_a >= proba_b else body.get("fighter_b")
+    return jsonify({"winner": winner})
 
 
 if __name__ == "__main__":

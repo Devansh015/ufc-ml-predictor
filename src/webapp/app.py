@@ -134,14 +134,21 @@ def predict():
         winner = body.get("fighter_a") if proba_a > proba_b else body.get("fighter_b")
         return jsonify({"winner": winner})
 
-    Xsyn = build_synthetic_row(df, a, b, saved_features, use_recency=recency, decay=decay, last_n=last_n)
+    # build synthetic features using a canonical ordering so predictions are order-invariant
+    a_can, b_can = (a, b) if a <= b else (b, a)
+    Xsyn = build_synthetic_row(df, a_can, b_can, saved_features, use_recency=recency, decay=decay, last_n=last_n)
     Xsyn = Xsyn.reindex(columns=saved_features)
     Xsyn = Xsyn.apply(pd.to_numeric, errors="coerce").fillna(0.0)
     if imputer is not None:
         Xsyn = pd.DataFrame(imputer.transform(Xsyn), columns=Xsyn.columns)
     proba_red = clf.predict_proba(Xsyn)[:, 1][0]
-    proba_a = proba_red
-    proba_b = 1.0 - proba_a
+    # map probability back to the caller's fighter order
+    if a == a_can:
+        proba_a = proba_red
+        proba_b = 1.0 - proba_red
+    else:
+        proba_a = 1.0 - proba_red
+        proba_b = proba_red
     winner = body.get("fighter_a") if proba_a > proba_b else body.get("fighter_b")
     return jsonify({"winner": winner})
 

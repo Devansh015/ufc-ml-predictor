@@ -132,8 +132,65 @@ def predict():
         proba_red = clf.predict_proba(X)[:, 1][0]
         proba_a = 1.0 - proba_red if swapped else proba_red
         proba_b = 1.0 - proba_a
+
+        # prepare stat breakdown
+        stat_map = [
+            ("striking_accuracy", "sig_acc"),
+            ("strikes_per_min", "sig_landed_per_min"),
+            ("takedown_acc", "td_acc"),
+            ("takedowns_per_15", "td_landed_per_15"),
+            ("striking_def", "sig_acc"),
+            ("takedown_def", "td_acc"),
+            ("reach", "reach"),
+        ]
+
+        def map_red_to_inputs(red_name_is_a: bool):
+            return (body.get("fighter_a"), body.get("fighter_b")) if red_name_is_a else (body.get("fighter_b"), body.get("fighter_a"))
+
+        # if swapped==False then match_row red==fighter_a
+        red_is_a = not swapped
+        fighter_a_name, fighter_b_name = map_red_to_inputs(red_is_a)
+
+        stats = {}
+        row = X.iloc[0]
+        for label, feat in stat_map:
+            red_col = f"red_{feat}"
+            blue_col = f"blue_{feat}"
+            red_val = float(row[red_col]) if red_col in row.index and pd.notna(row[red_col]) else None
+            blue_val = float(row[blue_col]) if blue_col in row.index and pd.notna(row[blue_col]) else None
+
+            # for defensive metrics, invert opponent accuracy when appropriate
+            if label == "striking_def" and red_val is None and blue_val is None:
+                # try to infer from opponent's accuracy
+                pass
+
+            # map to caller ordering
+            if red_is_a:
+                a_val, b_val = red_val, blue_val
+            else:
+                a_val, b_val = blue_val, red_val
+
+            better = None
+            try:
+                if a_val is not None and b_val is not None:
+                    if a_val > b_val:
+                        better = fighter_a_name
+                    elif b_val > a_val:
+                        better = fighter_b_name
+            except Exception:
+                better = None
+
+            stats[label] = {"fighter_a": a_val, "fighter_b": b_val, "better": better}
+
         winner = body.get("fighter_a") if proba_a > proba_b else body.get("fighter_b")
-        return jsonify({"winner": winner})
+        return jsonify({
+            "winner": winner,
+            "p_a": float(proba_a),
+            "p_b": float(proba_b),
+            "p_a_pct": round(float(proba_a) * 100.0, 1),
+            "p_b_pct": round(float(proba_b) * 100.0, 1),
+            "stats": stats,
+        })
 
     # build synthetic features using a canonical ordering so predictions are order-invariant
     a_can, b_can = (a, b) if a <= b else (b, a)
@@ -150,8 +207,53 @@ def predict():
     else:
         proba_a = 1.0 - proba_red
         proba_b = proba_red
+    # build same stat breakdown for synthetic row
+    stat_map = [
+        ("striking_accuracy", "sig_acc"),
+        ("strikes_per_min", "sig_landed_per_min"),
+        ("takedown_acc", "td_acc"),
+        ("takedowns_per_15", "td_landed_per_15"),
+        ("striking_def", "sig_acc"),
+        ("takedown_def", "td_acc"),
+        ("reach", "reach"),
+    ]
+
+    # red corresponds to a_can
+    red_is_a = (a == a_can)
+    fighter_a_name = body.get("fighter_a")
+    fighter_b_name = body.get("fighter_b")
+
+    stats = {}
+    row = Xsyn.iloc[0]
+    for label, feat in stat_map:
+        red_col = f"red_{feat}"
+        blue_col = f"blue_{feat}"
+        red_val = float(row[red_col]) if red_col in row.index and pd.notna(row[red_col]) else None
+        blue_val = float(row[blue_col]) if blue_col in row.index and pd.notna(row[blue_col]) else None
+
+        if red_is_a:
+            a_val, b_val = red_val, blue_val
+        else:
+            a_val, b_val = blue_val, red_val
+
+        better = None
+        if a_val is not None and b_val is not None:
+            if a_val > b_val:
+                better = fighter_a_name
+            elif b_val > a_val:
+                better = fighter_b_name
+
+        stats[label] = {"fighter_a": a_val, "fighter_b": b_val, "better": better}
+
     winner = body.get("fighter_a") if proba_a > proba_b else body.get("fighter_b")
-    return jsonify({"winner": winner})
+    return jsonify({
+        "winner": winner,
+        "p_a": float(proba_a),
+        "p_b": float(proba_b),
+        "p_a_pct": round(float(proba_a) * 100.0, 1),
+        "p_b_pct": round(float(proba_b) * 100.0, 1),
+        "stats": stats,
+    })
 
 
 if __name__ == "__main__":

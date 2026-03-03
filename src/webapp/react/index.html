@@ -658,12 +658,8 @@
               </div>
 
               <div className="controls-bar">
-                <Toggle checked={recency} onChange={setRecency} label="Recency weighting" />
                 <div className="controls-spacer" />
                 <button className="btn btn-ghost" onClick={shareLink}>Share</button>
-                <button className="btn btn-ghost" onClick={() => setShowDetails(s => !s)}>
-                  {showDetails ? 'Hide JSON' : 'JSON'}
-                </button>
                 <button className="btn btn-primary" onClick={predict} disabled={loading || !fighterA.trim() || !fighterB.trim()}>
                   {loading
                     ? <><span className="spinner" /> Analyzing...</>

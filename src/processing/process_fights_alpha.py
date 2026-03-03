@@ -394,39 +394,6 @@ def main():
 
     df = pd.DataFrame(rows)
 
-    # --- Symmetry augmentation: add mirrored rows with red/blue swapped ---
-    if not df.empty:
-        swapped_rows = []
-        for _, r in df.iterrows():
-            newr = {}
-            for col, val in r.items():
-                if col == 'red_fighter':
-                    newr['red_fighter'] = r.get('blue_fighter')
-                elif col == 'blue_fighter':
-                    newr['blue_fighter'] = r.get('red_fighter')
-                elif col.startswith('red_'):
-                    # red_X becomes blue_X
-                    newr['blue_' + col[len('red_'):]] = val
-                elif col.startswith('blue_'):
-                    # blue_X becomes red_X
-                    newr['red_' + col[len('blue_'):]] = val
-                elif col == 'red_win':
-                    # will set below based on original 'winner'
-                    continue
-                else:
-                    # keep other columns (fight_url, etc.) unchanged
-                    newr[col] = val
-            swapped_rows.append(newr)
-        # set red_win for swapped rows using original winner label
-        for nr, orig in zip(swapped_rows, df.itertuples(index=False)):
-            # orig.winner is the original winner string ('red' or 'blue')
-            winner_label = orig._asdict().get('winner') if hasattr(orig, '_asdict') else orig[ df.columns.get_loc('winner') ]
-            nr['red_win'] = 1 if winner_label == 'blue' else 0
-
-        df_swapped = pd.DataFrame(swapped_rows)
-        # ensure same column order/types
-        df = pd.concat([df, df_swapped], ignore_index=True, sort=False)
-
     if df.empty or ("red_fights" not in df.columns) or ("blue_fights" not in df.columns):
         print("No feature rows were generated.")
         print("This usually means per-fight per-fighter stats could not be derived from the scraped CSVs.")
@@ -435,6 +402,32 @@ def main():
 
     # Filter: both fighters must have at least 1 prior fight
     df = df[(df["red_fights"] >= 1) & (df["blue_fights"] >= 1)]
+
+    # ---- Remove leaked / dead columns ----
+    # 'winner' is the raw label string — must not be in the feature file
+    # 'blue_win' was a derivative of red_win — direct target leakage
+    leak_cols = [c for c in ["winner", "blue_win"] if c in df.columns]
+    if leak_cols:
+        df = df.drop(columns=leak_cols)
+        print(f"Dropped leaked columns: {leak_cols}")
+
+    # Drop columns that are 100% NaN (stats we can't derive from round_stats)
+    all_nan_cols = [c for c in df.columns if df[c].isna().all()]
+    if all_nan_cols:
+        df = df.drop(columns=all_nan_cols)
+        print(f"Dropped all-NaN columns ({len(all_nan_cols)}): {all_nan_cols}")
+
+    # Drop numeric columns that are entirely zero (useless deltas of NaN stats)
+    all_zero_cols = [
+        c for c in df.select_dtypes(include="number").columns
+        if (df[c] == 0).all() and c not in ["red_win"]
+    ]
+    if all_zero_cols:
+        df = df.drop(columns=all_zero_cols)
+        print(f"Dropped all-zero columns ({len(all_zero_cols)}): {all_zero_cols}")
+
+    # NOTE: Symmetry augmentation is now done at training time to prevent
+    # both versions of a fight leaking across the train/test split.
 
     out_path = OUT_DIR / "fight_features_alpha.csv"
     df.to_csv(out_path, index=False)

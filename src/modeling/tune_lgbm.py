@@ -11,13 +11,19 @@ from sklearn.impute import SimpleImputer
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 
 
+# Columns that must never be used as features (target leakage)
+_LEAK_COLS = {"winner", "blue_win"}
+
+
 def load_and_prep(path, target_col="red_win"):
     df = pd.read_csv(path)
     df.columns = df.columns.str.strip()
     if target_col not in df.columns:
         raise KeyError(f"Target column '{target_col}' not found in {path}.")
     y = df[target_col].astype(int)
-    drop_cols = [c for c in ["fight_url", "red_fighter", "blue_fighter"] if c in df.columns]
+    drop_cols = [c for c in
+                 ["fight_url", "red_fighter", "blue_fighter"] | _LEAK_COLS
+                 if c in df.columns]
     X = df.drop(columns=drop_cols + [target_col], errors="ignore")
     X = X.select_dtypes(include=[np.number])
     # drop all-NaN cols
@@ -75,9 +81,11 @@ def main():
     best = study.best_params
     best["n_estimators"] = int(best["n_estimators"]) if "n_estimators" in best else 100
 
-    # train final model on full data
+    # Train final model on 80% data (keep 20% truly unseen for honest eval)
+    from sklearn.model_selection import train_test_split as _tts
+    X_fit, _X_hold, y_fit, _y_hold = _tts(X, y, test_size=0.2, stratify=y, random_state=42)
     final_clf = lgb.LGBMClassifier(**best, n_jobs=-1, random_state=42)
-    final_clf.fit(X, y)
+    final_clf.fit(X_fit, y_fit)
 
     Path(args.model_out).parent.mkdir(parents=True, exist_ok=True)
     joblib.dump({"model": final_clf, "imputer": imputer, "features": list(X.columns)}, args.model_out)

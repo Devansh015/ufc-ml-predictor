@@ -29,7 +29,7 @@ def _feature_target_split(df, target_col="red_win"):
     """Return (X_numeric, y) after dropping non-feature and leaked columns."""
     y = df[target_col].astype(int)
     drop_cols = [c for c in
-                 ["fight_url", "red_fighter", "blue_fighter"] | _LEAK_COLS
+                 {"fight_url", "red_fighter", "blue_fighter"} | _LEAK_COLS
                  if c in df.columns]
     X = df.drop(columns=drop_cols + [target_col], errors="ignore")
     X = X.select_dtypes(include=[np.number])
@@ -69,47 +69,52 @@ def main():
     p.add_argument("--model-out", default="models/lgbm_symmetric.pkl")
     p.add_argument("--metrics-out", default="models/metrics_symmetric.json")
     p.add_argument("--feature-imp-out", default="models/feature_importances_symmetric.csv")
-    p.add_argument("--test-size", type=float, default=0.2)
+    p.add_argument("--test-size", type=float, default=0.15)
+    p.add_argument("--val-size", type=float, default=0.15)
     p.add_argument("--random-state", type=int, default=42)
-    p.add_argument("--n-estimators", type=int, default=500)
-    p.add_argument("--early-stopping", type=int, default=50)
+    p.add_argument("--n-estimators", type=int, default=2000)
+    p.add_argument("--early-stopping", type=int, default=200)
     args = p.parse_args()
 
     df = load_and_prep(args.input)
 
-    # ---- Fight-URL-grouped train/test split (prevents augmented-pair leakage) ----
+    # ---- Fight-URL-grouped 3-way split (train/val/test) ----
+    # Prevents augmented-pair leakage and uses *non-augmented* val for early stopping
     fight_urls = df["fight_url"].unique()
     rng = np.random.RandomState(args.random_state)
     rng.shuffle(fight_urls)
-    split_idx = int(len(fight_urls) * (1 - args.test_size))
-    train_urls = set(fight_urls[:split_idx])
-    test_urls = set(fight_urls[split_idx:])
+    n = len(fight_urls)
+    train_end = int(n * (1 - args.test_size - args.val_size))
+    val_end = int(n * (1 - args.test_size))
 
-    train_df = df[df["fight_url"].isin(train_urls)].copy()
-    test_df = df[df["fight_url"].isin(test_urls)].copy()
+    train_urls = set(fight_urls[:train_end])
+    val_urls = set(fight_urls[train_end:val_end])
+    test_urls = set(fight_urls[val_end:])
+
+    raw_train = df[df["fight_url"].isin(train_urls)].copy()
+    raw_val = df[df["fight_url"].isin(val_urls)].copy()
+    raw_test = df[df["fight_url"].isin(test_urls)].copy()
 
     # Symmetry-augment ONLY the training set
-    train_df = symmetry_augment(train_df)
+    train_df = symmetry_augment(raw_train)
 
     X_train, y_train = _feature_target_split(train_df)
-    X_test, y_test = _feature_target_split(test_df)
+    X_val, y_val = _feature_target_split(raw_val)      # NOT augmented
+    X_test, y_test = _feature_target_split(raw_test)    # NOT augmented
 
-    # Align columns (test may lack a column if it was all-NaN in test only)
-    common_cols = [c for c in X_train.columns if c in X_test.columns]
+    # Align columns across all three sets
+    common_cols = sorted(set(X_train.columns) & set(X_val.columns) & set(X_test.columns))
     X_train = X_train[common_cols]
+    X_val = X_val[common_cols]
     X_test = X_test[common_cols]
 
     imputer = SimpleImputer(strategy="median")
-    X_train = pd.DataFrame(imputer.fit_transform(X_train), columns=X_train.columns)
-    X_test = pd.DataFrame(imputer.transform(X_test), columns=X_test.columns)
+    X_train = pd.DataFrame(imputer.fit_transform(X_train), columns=common_cols)
+    X_val = pd.DataFrame(imputer.transform(X_val), columns=common_cols)
+    X_test = pd.DataFrame(imputer.transform(X_test), columns=common_cols)
 
-    print(f"Train rows: {len(X_train)} (augmented)  |  Test rows: {len(X_test)}")
-    print(f"Features: {len(X_train.columns)}")
-
-    # further split train -> train/val for early stopping
-    X_tr, X_val, y_tr, y_val = train_test_split(
-        X_train, y_train, test_size=0.15, stratify=y_train, random_state=args.random_state
-    )
+    print(f"Train: {len(X_train)} (augmented)  |  Val: {len(X_val)}  |  Test: {len(X_test)}")
+    print(f"Features: {len(common_cols)}")
 
     # allow loading tuned params
     model_params = {}
@@ -126,19 +131,25 @@ def main():
 
     # ensure n_estimators and random_state
     model_params.setdefault("n_estimators", args.n_estimators)
+    model_params.setdefault("learning_rate", 0.01)
+    model_params.setdefault("num_leaves", 16)
+    model_params.setdefault("min_child_samples", 20)
+    model_params.setdefault("subsample", 0.8)
+    model_params.setdefault("colsample_bytree", 0.8)
+    model_params.setdefault("reg_lambda", 1.0)
+    model_params.setdefault("reg_alpha", 0.1)
     model_params.setdefault("random_state", args.random_state)
     model_params.setdefault("n_jobs", -1)
 
-    clf = lgb.LGBMClassifier(**model_params)
+    clf = lgb.LGBMClassifier(**model_params, verbose=-1)
 
-    # fit with early stopping via callbacks
+    # fit with early stopping on non-augmented validation set
     callbacks = []
     if args.early_stopping and int(args.early_stopping) > 0:
         callbacks.append(lgb.early_stopping(stopping_rounds=int(args.early_stopping)))
-    # silence training logs
     callbacks.append(lgb.log_evaluation(period=0))
 
-    clf.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], eval_metric="auc", callbacks=callbacks)
+    clf.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric="auc", callbacks=callbacks)
 
     # predictions
     y_pred_proba = clf.predict_proba(X_test)[:, 1]
@@ -156,14 +167,14 @@ def main():
 
     # outputs
     Path(args.model_out).parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": clf, "imputer": imputer, "features": list(X_train.columns)}, args.model_out)
+    joblib.dump({"model": clf, "imputer": imputer, "features": list(common_cols)}, args.model_out)
 
     Path(args.metrics_out).parent.mkdir(parents=True, exist_ok=True)
     with open(args.metrics_out, "w") as fh:
         json.dump(metrics, fh, indent=2)
 
     # feature importances
-    fi = pd.DataFrame({"feature": X_train.columns, "importance": clf.feature_importances_})
+    fi = pd.DataFrame({"feature": common_cols, "importance": clf.feature_importances_})
     fi = fi.sort_values("importance", ascending=False)
     fi.to_csv(args.feature_imp_out, index=False)
 

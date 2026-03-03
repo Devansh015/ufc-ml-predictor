@@ -22,7 +22,7 @@ def load_and_prep(path, target_col="red_win"):
         raise KeyError(f"Target column '{target_col}' not found in {path}.")
     y = df[target_col].astype(int)
     drop_cols = [c for c in
-                 ["fight_url", "red_fighter", "blue_fighter"] | _LEAK_COLS
+                 {"fight_url", "red_fighter", "blue_fighter"} | _LEAK_COLS
                  if c in df.columns]
     X = df.drop(columns=drop_cols + [target_col], errors="ignore")
     X = X.select_dtypes(include=[np.number])

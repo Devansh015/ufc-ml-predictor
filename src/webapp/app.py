@@ -97,6 +97,22 @@ def build_synthetic_row(df: pd.DataFrame, a: str, b: str, feature_cols, use_rece
     return pd.DataFrame([row])
 
 
+# Build unique fighters list at startup
+_all_fighters = sorted(
+    set(
+        df["red_fighter"].dropna().str.strip().tolist()
+        + df["blue_fighter"].dropna().str.strip().tolist()
+    ),
+    key=str.lower,
+)
+
+
+@app.route("/fighters", methods=["GET"])
+def fighters():
+    """Return list of all fighter names for autocomplete."""
+    return jsonify(_all_fighters)
+
+
 @app.route("/", methods=["GET"])
 def index():
     # Serve React single-file UI

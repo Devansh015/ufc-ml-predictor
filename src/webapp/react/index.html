@@ -109,6 +109,10 @@
       }
       .corner-red { color: #ef4444; }
       .corner-blue { color: #3b82f6; }
+      .fighter-input-wrapper {
+        position: relative;
+        width: 100%;
+      }
       .fighter-input {
         width: 100%;
         padding: 14px 16px;
@@ -126,6 +130,60 @@
         box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
       }
       .fighter-input::placeholder { color: #475569; font-weight:400; }
+
+      /* ── Autocomplete Dropdown ─────────────────────────── */
+      .autocomplete-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: rgba(20, 20, 30, 0.98);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 12px;
+        max-height: 240px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+      .autocomplete-dropdown::-webkit-scrollbar {
+        width: 6px;
+      }
+      .autocomplete-dropdown::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .autocomplete-dropdown::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.15);
+        border-radius: 3px;
+      }
+      .autocomplete-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: #cbd5e1;
+        transition: background 0.15s, color 0.15s;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+      }
+      .autocomplete-item:last-child {
+        border-bottom: none;
+      }
+      .autocomplete-item:hover,
+      .autocomplete-item.highlighted {
+        background: rgba(220,38,38,0.15);
+        color: #f1f5f9;
+      }
+      .autocomplete-item-match {
+        color: #f59e0b;
+        font-weight: 700;
+      }
+      .autocomplete-empty {
+        padding: 14px 16px;
+        font-size: 13px;
+        color: #64748b;
+        text-align: center;
+      }
       .vs-divider {
         display: flex; align-items: center; justify-content: center;
         padding: 0 20px;
@@ -526,6 +584,133 @@
         );
       }
 
+      /* ── Fighter Input with Autocomplete ─────────── */
+      function FighterInput({ value, onChange, placeholder, fighters, onSelect }) {
+        const [showDropdown, setShowDropdown] = useState(false);
+        const [highlightedIndex, setHighlightedIndex] = useState(-1);
+        const wrapperRef = useRef(null);
+        const inputRef = useRef(null);
+
+        // Filter fighters based on input
+        const filteredFighters = value.trim().length > 0
+          ? fighters.filter(f => f.toLowerCase().includes(value.toLowerCase())).slice(0, 50)
+          : [];
+
+        // Close dropdown on click outside
+        useEffect(() => {
+          function handleClickOutside(e) {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+              setShowDropdown(false);
+            }
+          }
+          document.addEventListener('mousedown', handleClickOutside);
+          return () => document.removeEventListener('mousedown', handleClickOutside);
+        }, []);
+
+        // Reset highlight when filtered list changes
+        useEffect(() => {
+          setHighlightedIndex(-1);
+        }, [value]);
+
+        function handleInputChange(e) {
+          onChange(e.target.value);
+          setShowDropdown(true);
+        }
+
+        function handleSelect(fighter) {
+          onChange(fighter);
+          if (onSelect) onSelect(fighter);
+          setShowDropdown(false);
+          setHighlightedIndex(-1);
+        }
+
+        function handleKeyDown(e) {
+          if (!showDropdown || filteredFighters.length === 0) {
+            if (e.key === 'ArrowDown' && value.trim().length > 0) {
+              setShowDropdown(true);
+            }
+            return;
+          }
+
+          switch (e.key) {
+            case 'ArrowDown':
+              e.preventDefault();
+              setHighlightedIndex(prev =>
+                prev < filteredFighters.length - 1 ? prev + 1 : 0
+              );
+              break;
+            case 'ArrowUp':
+              e.preventDefault();
+              setHighlightedIndex(prev =>
+                prev > 0 ? prev - 1 : filteredFighters.length - 1
+              );
+              break;
+            case 'Enter':
+              if (highlightedIndex >= 0 && highlightedIndex < filteredFighters.length) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSelect(filteredFighters[highlightedIndex]);
+              }
+              break;
+            case 'Escape':
+              setShowDropdown(false);
+              setHighlightedIndex(-1);
+              break;
+            case 'Tab':
+              setShowDropdown(false);
+              break;
+          }
+        }
+
+        function highlightMatch(text, query) {
+          if (!query.trim()) return text;
+          const idx = text.toLowerCase().indexOf(query.toLowerCase());
+          if (idx === -1) return text;
+          return (
+            <>
+              {text.slice(0, idx)}
+              <span className="autocomplete-item-match">{text.slice(idx, idx + query.length)}</span>
+              {text.slice(idx + query.length)}
+            </>
+          );
+        }
+
+        return (
+          <div className="fighter-input-wrapper" ref={wrapperRef}>
+            <input
+              ref={inputRef}
+              className="fighter-input"
+              type="text"
+              value={value}
+              onChange={handleInputChange}
+              onFocus={() => value.trim().length > 0 && setShowDropdown(true)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              spellCheck="false"
+              autoComplete="off"
+            />
+            {showDropdown && value.trim().length > 0 && (
+              <div className="autocomplete-dropdown">
+                {filteredFighters.length > 0 ? (
+                  filteredFighters.map((fighter, idx) => (
+                    <div
+                      key={fighter}
+                      className={`autocomplete-item ${idx === highlightedIndex ? 'highlighted' : ''}`}
+                      onClick={() => handleSelect(fighter)}
+                      onMouseEnter={() => setHighlightedIndex(idx)}
+                    >
+                      {highlightMatch(fighter, value)}
+                    </div>
+                  ))
+                ) : (
+                  <div className="autocomplete-empty">No fighters found</div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+
       /* ── Stat Comparison Row ─────────────────────── */
       function StatRow({ label, valA, valB, nameA, nameB, animate }) {
         const maxVal = Math.max(Math.abs(valA || 0), Math.abs(valB || 0), 0.001);
@@ -563,11 +748,20 @@
       function App() {
         const [fighterA, setFighterA] = useState('');
         const [fighterB, setFighterB] = useState('');
+        const [fighters, setFighters] = useState([]);
         const [recency, setRecency] = useState(true);
         const [result, setResult] = useState(null);
         const [loading, setLoading] = useState(false);
         const [showDetails, setShowDetails] = useState(false);
         const [animateStats, setAnimateStats] = useState(false);
+
+        // Fetch fighters list on mount
+        useEffect(() => {
+          fetch('/fighters')
+            .then(res => res.json())
+            .then(data => setFighters(data))
+            .catch(err => console.error('Failed to load fighters:', err));
+        }, []);
 
         // URL params on mount
         useEffect(() => {
@@ -632,13 +826,11 @@
               <div className="matchup-grid">
                 <div className="fighter-input-group">
                   <span className="corner-label corner-red">Red Corner</span>
-                  <input
-                    className="fighter-input"
-                    type="text"
+                  <FighterInput
                     value={fighterA}
-                    onChange={e => setFighterA(e.target.value)}
+                    onChange={setFighterA}
                     placeholder="e.g. Khabib Nurmagomedov"
-                    spellCheck="false"
+                    fighters={fighters}
                   />
                 </div>
                 <div className="vs-divider">
@@ -646,13 +838,11 @@
                 </div>
                 <div className="fighter-input-group">
                   <span className="corner-label corner-blue">Blue Corner</span>
-                  <input
-                    className="fighter-input"
-                    type="text"
+                  <FighterInput
                     value={fighterB}
-                    onChange={e => setFighterB(e.target.value)}
+                    onChange={setFighterB}
                     placeholder="e.g. Conor McGregor"
-                    spellCheck="false"
+                    fighters={fighters}
                   />
                 </div>
               </div>

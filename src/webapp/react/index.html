@@ -251,12 +251,6 @@
         box-shadow: 0 6px 24px rgba(220,38,38,0.45);
         transform: translateY(-1px);
       }
-      .btn-ghost {
-        background: rgba(255,255,255,0.04);
-        color: #94a3b8;
-        border: 1px solid rgba(255,255,255,0.08);
-      }
-      .btn-ghost:hover { background: rgba(255,255,255,0.08); color:#e2e8f0; }
       .controls-spacer { flex:1; }
 
       /* ── Spinner ────────────────────────────────────────── */
@@ -800,13 +794,6 @@
           return () => window.removeEventListener('keydown', onKey);
         }, [predict]);
 
-        function shareLink() {
-          const url = new URL(window.location.href);
-          url.searchParams.set('a', fighterA);
-          url.searchParams.set('b', fighterB);
-          navigator.clipboard.writeText(url.toString()).catch(() => {});
-        }
-
         const pA = result ? (result.p_a ?? 0.5) : 0.5;
         const pB = result ? (result.p_b ?? 0.5) : 0.5;
 
@@ -848,7 +835,6 @@
 
               <div className="controls-bar">
                 <div className="controls-spacer" />
-                <button className="btn btn-ghost" onClick={shareLink}>Share</button>
                 <button className="btn btn-primary" onClick={predict} disabled={loading || !fighterA.trim() || !fighterB.trim()}>
                   {loading
                     ? <><span className="spinner" /> Analyzing...</>

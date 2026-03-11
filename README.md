@@ -1,7 +1,6 @@
 # 🥊 UFC ML Fight Predictor
 
-A machine learning project that predicts the winner of a UFC fight based on historical fight data, with plans for an interactive frontend that allows users to easily select two fighters and generate a prediction.
-
+A machine learning project that predicts the winner of a UFC fight based on historical fight data, designed to beat my gambling addicted friends 
 ## 🔍 Overview
 
 This project uses historical UFCStats data to train machine learning models that estimate win probabilities for upcoming matchups. Users provide two fighters (Red vs Blue corner), and the model outputs a predicted winner along with confidence scores.

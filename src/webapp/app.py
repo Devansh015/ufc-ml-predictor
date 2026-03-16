@@ -2,11 +2,14 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 import joblib
 import pandas as pd
 import numpy as np
+import re
 from pathlib import Path
+from collections import defaultdict
 import os
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "features" / "fight_features_alpha.csv"
+DETAILS_PATH = ROOT / "data" / "raw" / "fight_details.csv"
 DEFAULT_MODEL = ROOT / "models" / "lgbm_symmetric.pkl"
 
 app = Flask(__name__)
@@ -17,6 +20,50 @@ model_pkg = joblib.load(DEFAULT_MODEL)
 clf = model_pkg.get("model") or model_pkg
 imputer = model_pkg.get("imputer")
 saved_features = model_pkg.get("features")
+
+# ── Weight-class mapping ──────────────────────────────────────────
+# Ordered longest-first so "Light Heavyweight" matches before "Heavyweight", etc.
+STANDARD_CLASSES = [
+    "Women's Featherweight",
+    "Women's Bantamweight",
+    "Women's Flyweight",
+    "Women's Strawweight",
+    "Light Heavyweight",
+    "Heavyweight",
+    "Middleweight",
+    "Welterweight",
+    "Lightweight",
+    "Featherweight",
+    "Bantamweight",
+    "Flyweight",
+    "Strawweight",
+]
+
+def _extract_weight_class(subtitle: str) -> str | None:
+    """Map a fight_subtitle like 'UFC Interim Lightweight Title Bout' → 'Lightweight'."""
+    if not isinstance(subtitle, str):
+        return None
+    for wc in STANDARD_CLASSES:
+        if wc.lower() in subtitle.lower():
+            return wc
+    return None
+
+details_df = pd.read_csv(DETAILS_PATH)
+details_df["weight_class"] = details_df["fight_subtitle"].apply(_extract_weight_class)
+# merge weight class onto the features dataframe via fight_url
+_wc_map = details_df.dropna(subset=["weight_class"]).drop_duplicates("fight_url")[["fight_url", "weight_class"]]
+df = df.merge(_wc_map, on="fight_url", how="left")
+
+# Build fighter → set of weight classes
+_fighter_classes: dict[str, set[str]] = defaultdict(set)
+for _, row in df.dropna(subset=["weight_class"]).iterrows():
+    wc = row["weight_class"]
+    rf = str(row["red_fighter"]).strip()
+    bf = str(row["blue_fighter"]).strip()
+    if rf:
+        _fighter_classes[rf].add(wc)
+    if bf:
+        _fighter_classes[bf].add(wc)
 
 
 def normalize(name: str) -> str:
@@ -106,10 +153,36 @@ _all_fighters = sorted(
     key=str.lower,
 )
 
+# Weight classes that actually have fighters (sorted by weight, heaviest first for men, then women)
+_WEIGHT_ORDER = [
+    "Heavyweight", "Light Heavyweight", "Middleweight", "Welterweight",
+    "Lightweight", "Featherweight", "Bantamweight", "Flyweight", "Strawweight",
+    "Women's Featherweight", "Women's Bantamweight", "Women's Flyweight", "Women's Strawweight",
+]
+_active_classes = [wc for wc in _WEIGHT_ORDER if any(wc in classes for classes in _fighter_classes.values())]
+
+# Pre-compute fighters per weight class
+_fighters_by_class: dict[str, list[str]] = {}
+for wc in _active_classes:
+    names = sorted(
+        [name for name, classes in _fighter_classes.items() if wc in classes],
+        key=str.lower,
+    )
+    _fighters_by_class[wc] = names
+
+
+@app.route("/weightclasses", methods=["GET"])
+def weightclasses():
+    """Return ordered list of weight classes."""
+    return jsonify(_active_classes)
+
 
 @app.route("/fighters", methods=["GET"])
 def fighters():
-    """Return list of all fighter names for autocomplete."""
+    """Return list of fighter names, optionally filtered by weight class."""
+    wc = request.args.get("weight_class", "").strip()
+    if wc and wc in _fighters_by_class:
+        return jsonify(_fighters_by_class[wc])
     return jsonify(_all_fighters)
 
 

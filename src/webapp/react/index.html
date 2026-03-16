@@ -197,6 +197,46 @@
         user-select: none;
       }
 
+      /* ── Weight Class Select ────────────────────────────── */
+      .weightclass-section {
+        margin-bottom: 20px;
+      }
+      .weightclass-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin-bottom: 8px;
+      }
+      .weightclass-select {
+        width: 100%;
+        padding: 14px 16px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+        color: #f1f5f9;
+        font-size: 15px;
+        font-weight: 600;
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 16px center;
+        background-size: 16px;
+      }
+      .weightclass-select:focus {
+        border-color: rgba(255,255,255,0.18);
+        box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+      }
+      .weightclass-select option {
+        background: #14141e;
+        color: #e2e8f0;
+      }
+
       /* ── Controls Bar ──────────────────────────────────── */
       .controls-bar {
         display: flex;
@@ -740,6 +780,8 @@
 
       /* ── Main App ────────────────────────────────── */
       function App() {
+        const [weightClass, setWeightClass] = useState('');
+        const [weightClasses, setWeightClasses] = useState([]);
         const [fighterA, setFighterA] = useState('');
         const [fighterB, setFighterB] = useState('');
         const [fighters, setFighters] = useState([]);
@@ -749,17 +791,37 @@
         const [showDetails, setShowDetails] = useState(false);
         const [animateStats, setAnimateStats] = useState(false);
 
-        // Fetch fighters list on mount
+        // Fetch weight classes on mount
         useEffect(() => {
-          fetch('/fighters')
+          fetch('/weightclasses')
+            .then(res => res.json())
+            .then(data => setWeightClasses(data))
+            .catch(err => console.error('Failed to load weight classes:', err));
+        }, []);
+
+        // Fetch fighters when weight class changes
+        useEffect(() => {
+          const url = weightClass
+            ? `/fighters?weight_class=${encodeURIComponent(weightClass)}`
+            : '/fighters';
+          fetch(url)
             .then(res => res.json())
             .then(data => setFighters(data))
             .catch(err => console.error('Failed to load fighters:', err));
-        }, []);
+        }, [weightClass]);
+
+        // Reset fighter selections when weight class changes
+        function handleWeightClassChange(wc) {
+          setWeightClass(wc);
+          setFighterA('');
+          setFighterB('');
+          setResult(null);
+        }
 
         // URL params on mount
         useEffect(() => {
           const params = new URLSearchParams(window.location.search);
+          if (params.get('wc')) setWeightClass(params.get('wc'));
           if (params.get('a')) setFighterA(params.get('a'));
           if (params.get('b')) setFighterB(params.get('b'));
         }, []);
@@ -809,13 +871,29 @@
 
             {/* Input Panel */}
             <div className="glass matchup-panel">
-              <div className="matchup-grid">
+              {/* Weight Class Selector */}
+              <div className="weightclass-section">
+                <div className="weightclass-label">Weight Class</div>
+                <select
+                  className="weightclass-select"
+                  value={weightClass}
+                  onChange={e => handleWeightClassChange(e.target.value)}
+                >
+                  <option value="">Select a weight class...</option>
+                  {weightClasses.map(wc => (
+                    <option key={wc} value={wc}>{wc}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fighter Selection (only enabled after weight class chosen) */}
+              <div className="matchup-grid" style={{ opacity: weightClass ? 1 : 0.4, pointerEvents: weightClass ? 'auto' : 'none' }}>
                 <div className="fighter-input-group">
                   <span className="corner-label corner-red">Red Corner</span>
                   <FighterInput
                     value={fighterA}
                     onChange={setFighterA}
-                    placeholder="e.g. Khabib Nurmagomedov"
+                    placeholder={weightClass ? "Search fighter..." : "Select weight class first"}
                     fighters={fighters}
                   />
                 </div>
@@ -827,7 +905,7 @@
                   <FighterInput
                     value={fighterB}
                     onChange={setFighterB}
-                    placeholder="e.g. Conor McGregor"
+                    placeholder={weightClass ? "Search fighter..." : "Select weight class first"}
                     fighters={fighters}
                   />
                 </div>
@@ -835,7 +913,7 @@
 
               <div className="controls-bar">
                 <div className="controls-spacer" />
-                <button className="btn btn-primary" onClick={predict} disabled={loading || !fighterA.trim() || !fighterB.trim()}>
+                <button className="btn btn-primary" onClick={predict} disabled={loading || !weightClass || !fighterA.trim() || !fighterB.trim()}>
                   {loading
                     ? <><span className="spinner" /> Analyzing...</>
                     : <><svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Predict</>

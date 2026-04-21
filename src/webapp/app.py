@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, redirect
 import joblib
 import pandas as pd
 import numpy as np
@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "features" / "fight_features_alpha.csv"
 DETAILS_PATH = ROOT / "data" / "raw" / "fight_details.csv"
 DEFAULT_MODEL = ROOT / "models" / "lgbm_symmetric.pkl"
+PUBLIC_DIR = ROOT / "public"
 
 app = Flask(__name__)
 
@@ -188,7 +189,11 @@ def fighters():
 
 @app.route("/", methods=["GET"])
 def index():
-    # Serve React single-file UI
+    public_index = PUBLIC_DIR / "index.html"
+    if public_index.exists():
+        return redirect("/index.html", code=307)
+
+    # Fallback for local development before the public copy exists.
     react_dir = ROOT / "src" / "webapp" / "react"
     idx = react_dir / "index.html"
     if idx.exists():

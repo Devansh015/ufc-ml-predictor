@@ -37,6 +37,35 @@ The frontend will interface directly with the trained model via a simple API or 
 
 🚧 Actively in development — backend ML pipeline complete, frontend integration in progress.
 
+## ▲ Vercel Deployment
+
+This repo is now set up for a Vercel deployment with:
+
+- `app.py` as the root Flask entrypoint Vercel can detect
+- `public/index.html` as the static frontend entry
+- `vercel.json` bundling the runtime artifacts the predictor needs
+
+Before deploying from Git, make sure these runtime files are committed:
+
+- `data/features/fight_features_alpha.csv`
+- `data/raw/fight_details.csv`
+- `models/lgbm_symmetric.pkl`
+
+Local Vercel workflow:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+vercel dev
+```
+
+Deploy with:
+
+```bash
+vercel
+```
+
 ## ⚠️ Disclaimer
 
 This project is for educational and research purposes only.  

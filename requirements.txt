@@ -1,6 +1,7 @@
 requests
 beautifulsoup4
 lxml
+flask
 pandas
 numpy
 scikit-learn

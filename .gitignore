@@ -4,5 +4,7 @@ __pycache__/
 *.pyc
 .env
 instance/*.db
-data/raw/
-models/
+data/raw/*
+!data/raw/fight_details.csv
+models/*
+!models/lgbm_symmetric.pkl

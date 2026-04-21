@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "app.py": {
+      "includeFiles": "{data/features/**,data/raw/fight_details.csv,models/lgbm_symmetric.pkl}",
+      "excludeFiles": "{.git/**,.venv/**,src/webapp/.venv/**,**/__pycache__/**,**/*.pyc}"
+    }
+  }
+}
